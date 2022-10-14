@@ -1,0 +1,170 @@
+---
+title: "An Overview of King County Five Guys Visitors"
+author: "Duke Denham"
+date: "5/22/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, eval = TRUE, warning=FALSE)
+library(tidyverse)
+library(ggrepel)
+library(ggtext)
+library(showtext)
+library(extrafont)
+library(paletteer)
+library(ggpubr)
+library(ggforce)
+library(ggalt)
+library(scales)
+library(lubridate)
+library(gghighlight)
+library(tigris)
+kingDailyVisits <- readRDS('king_dailyvisits.Rdata')
+limited_service_burger <- kingDailyVisits %>% filter(brands %in% c("Arby's","McDonald's",'Burger King',"Carl's Jr.",'Chick-fil-A','Five Guys','Jack in the Box','Red Robin Gourmet Burgers','Shake Shack','Sonic','Wayback Burgers',"Wendy's",'The Habit Burger Grill', "Steak 'n Shake")) %>% 
+  mutate(day_of_week = wday(date)) %>%
+  mutate(weekend = case_when(
+    day_of_week %in% 2:6 ~ 'FALSE',
+    day_of_week %in% c(1,7) ~ 'TRUE'
+  ))
+
+ov <- readRDS('king_originvisits.Rdata')
+load('neighborhood_names.Rdata')
+
+ov_burger <- ov %>%
+  right_join(neighborhood_names) %>% 
+  filter(brands %in% c("Arby's","McDonald's",'Burger King',"Carl's Jr.",'Chick-fil-A','Five Guys','Jack in the Box','Red Robin Gourmet Burgers','Shake Shack','Sonic','Wayback Burgers',"Wendy's",'The Habit Burger Grill', "Steak 'n Shake"))
+```
+
+## Introduction
+
+  Five Guys is a fast casual burger chain restaurant focused on hamburgers, fries, and hot dogs. Originally started in Arlington County, Virginia in 1986, the franchise is known for its high quality burgers and its plethora of toppings that can be added to a burger. Currently, the company now has 1,500 locations with more to come and is one of the fastest growing fast food chains in America ([Five Guys](https://www.fiveguys.com/fans/the-five-guys-story)). With six locations in the King County area, this report will analyze Five Guys' performance at bringing in visitors from King County to its' locations for July 2020. Its' performance will be compared to other limited-service burger restaurants (burger restaurants without table service) to determine what actions can be taken to attract more visitors to the brand.
+
+## Overview of All the Restaurants
+
+```{r total average, warning=FALSE}
+total_average <- limited_service_burger %>% 
+  group_by(brands) %>% summarize(average_daily_visits = mean(visits_by_day))
+
+ggplot(total_average, aes(x= reorder(brands, average_daily_visits), y= average_daily_visits)) + geom_lollipop(size=.9, color='#da341d') + 
+  coord_flip() + theme_light() +
+  geom_hline(aes(yintercept = mean(total_average$average_daily_visits)), linetype = 'dashed', color='#595d5b') +
+  gghighlight(brands == 'Five Guys', unhighlighted_params = aes(alpha=.6, color = '#f59191')) +
+  geom_text(aes(x =brands,y = average_daily_visits, label = round(average_daily_visits, digits=2),hjust=-.25, vjust=.3), size=4, family='serif', color='#da341d') +
+  labs(x=NULL,y= 'Average Daily Visits',title='Average Daily Visits by Restaurant') +
+  annotate(geom = 'label',x = "Wayback Burgers", y = mean(total_average$average_daily_visits), label = 'Group Average:\n186.42', family = 'serif', size = 8/.pt) +
+  annotate(geom = 'label',x = "Five Guys", y = 500, label = "Although not above the\naverage line, Five Guys is\nstill in the middle of the group.", family = 'serif', size = 10/.pt) +
+  geom_curve((aes(x = 'Five Guys', y = 299, xend = 'Five Guys', yend = 165)), arrow = arrow(length = unit(0.25, "cm")),curvature=0) +
+  theme(panel.grid.major.y = element_blank(), text = element_text(family = 'serif'), plot.title = element_text(face='bold', size= 17))
+```
+
+  Compared to all the limited-service burger restaurants, Five Guys performs somewhat well. Although it may seem as though the franchise is doing below average since its' daily visitors is below the group average of 186.42, this average is highly distorted by McDonald's, which brings in over twice as many daily visitors as the second highest brand, Jack in the Box. In actuality, Five Guys places in the middle of the group with 53.32 average daily visitors. Although not the worst performance, room for improvement obviously exists. Later sections will examine the performance of Arby's since it has the next highest average above Five Guys to examine what can be improved.
+
+## Weekdays vs. Weekends
+
+```{r typeofday, echo=FALSE}
+average_for_weekdays <- limited_service_burger %>% filter(weekend == 'FALSE') %>% group_by(brands) %>% summarize(average_weekday = mean(visits_by_day))
+average_for_weekends <- limited_service_burger %>% filter(weekend == 'TRUE') %>% group_by(brands) %>% summarize(average_weekend = mean(visits_by_day))
+average_by_type_day <- average_for_weekdays %>% left_join(average_for_weekends, by = 'brands')
+
+ggplot(average_by_type_day %>% filter(average_weekday < 100, average_weekday > 15), aes(x = average_weekday, xend = average_weekend, y=brands)) + 
+  geom_dumbbell(size_x = 3, size_xend = 3, colour = 'black', colour_x = '#da341d', colour_xend = '#1DC3DA') + theme_minimal() +
+  scale_x_continuous(breaks = scales::pretty_breaks(n = 5)) +
+  labs(x="Average Daily Visits", y=NULL, title="The Difference Between\nWeekday/Weekend Daily Visits")+
+  annotate(geom = 'text',x = 45.17, y = "The Habit Burger Grill", label = 'Weekday', family = 'serif', size = 10/.pt,color= '#da341d',vjust=-1.3)+
+  annotate(geom = 'text',x = 32.88, y = "The Habit Burger Grill", label = 'Weekend', family = 'serif', size = 10/.pt,color= '#1DC3DA',vjust=-1.3)+
+  annotate(geom = 'text',x = 52.04, y = "Five Guys", label = '53.04', family = 'serif', size = 10/.pt,color= '#da341d',vjust=-1.3)+
+  annotate(geom = 'text',x = 55.13, y = "Five Guys", label = '54.13', family = 'serif', size = 10/.pt,color= '#1DC3DA',vjust=1.9)+
+  annotate(geom = 'label',x = 46, y = "Carl's Jr.", label = 'Average between the two much\ncloser than other restaurants', family = 'serif', size = 9/.pt, vjust=1.1) +
+  geom_curve(aes(x = 46, y = "Carl's Jr.", xend = 52, yend = 'Five Guys'), arrow = arrow(length = unit(0.25, "cm")),curvature = -.5) +
+  annotate(geom = 'label',x = 62, y = "Shake Shack", label = 'One of the few restaurants\nwhere weekends have higher\naverage over weekdays', family = 'serif', size = 9/.pt, vjust=-.1) +
+  geom_curve(aes(x = 62, y = "Shake Shack", xend = 55, yend = 'Five Guys'), arrow = arrow(length = unit(0.25, "cm")),curvature = -.5) +
+  theme(text = element_text(family = 'serif'), plot.title = element_text(face='bold', size= 17))
+
+```
+
+  When broken into weekday and weekend averages, a few interesting factors arise. Firstly, Five Guys has one of the closest averages out of any of the restaurants. The difference between the average daily visits for weekdays and weekends is around one. Secondly, Five Guys is one of three limited-service burger restaurants where the average for weekends is higher than weekdays. One possible reason for this is that Five Guys doesn't function as a typical fast food restaurant. Five Guys locations don't contain any drive-throughs, and the food takes slightly longer to prepare than other fast food chains. Both of these attributes may cause some weekday visitors who are on work to go elsewhere. Five Guys should look to improve its weekday average, especially since many of the highest performing burger restaurants have weekday averages that surpass their weekend average by a decent margin such as Arby's. Five Guys could improve this by offering discounts on weekdays or opening future locations with drive-throughs.
+
+## Arby's vs. Five Guys: Breakdown of the Days
+
+```{r distribution five guys, echo= FALSE}
+
+ggplot(limited_service_burger %>% filter(brands == 'Five Guys'), aes(x=visits_by_day, fill=weekend)) + geom_histogram(binwidth = 2,boundary=30) + 
+  theme_minimal() + scale_x_continuous(minor_breaks = scales::pretty_breaks(n = 20)) + scale_y_continuous(limits=c(0,3.2))+
+  labs(x= 'Visits in a Day',y='Count' ,title= 'Distribution of Days for Five Guys') +
+  scale_fill_manual(values = c('#da341d','#1DC3DA')) +
+  guides(fill="none") +
+  annotate(geom = 'text',x = 57, y = 3.2, label = 'Weekday', family = 'serif', size = 11/.pt, color= '#da341d') +
+  annotate(geom = 'text',x = 63, y = 3.2, label = 'Weekend', family = 'serif', size = 11/.pt, color= '#1DC3DA') +
+  theme(panel.grid.minor.y = element_blank(), text = element_text(family = 'serif'), plot.title = element_text(face='bold', size= 17))
+
+```
+
+  Considering that Arby's has the next highest average daily visits above Five Guys at 68.68, evaluating the difference between the two brands could provide helpful insights into how Five Guys could pull in more visitors. When looking at the distribution of days for Five Guys, one can see that they're compactly distributed. The lowest performing day is only around 30 while the highest performing day is around 74.
+
+```{r distribution Arbys, echo= FALSE, warning=FALSE}
+
+ggplot(limited_service_burger %>% filter(brands == "Arby's"), aes(x=visits_by_day, fill=weekend)) +
+  geom_rect(aes(xmin = 82, xmax = 100, ymin = 0, ymax = 2), color= 'black', fill= 'transparent', size=.35) +
+  geom_histogram(binwidth = 2,boundary=48) + 
+  theme_minimal() + scale_x_continuous(breaks = scales::pretty_breaks(n = 5),minor_breaks = scales::pretty_breaks(n = 30) ,limits=c(48,101)) + scale_y_continuous(limits=c(0,4.2))+
+  labs(x= 'Visits in a Day',y='Count' ,title= "Distribution of Days for Arby's") +
+  scale_fill_manual(values = c('#da341d','#1DC3DA')) +
+  guides(fill="none") +
+  annotate(geom = 'text',x = 59, y = 3.2, label = 'Weekday', family = 'serif', size = 11/.pt, color= '#da341d') +
+  annotate(geom = 'text',x = 49, y = 2.2, label = 'Weekend', family = 'serif', size = 11/.pt, color= '#1DC3DA') +
+  annotate(geom = 'label',x = 90, y = 2.8, label = "Group of outliers that\nboost Arby's average visits", family = 'serif', size = 10/.pt)+
+  geom_curve(aes(x = 82, y = 2.8, xend = 81, yend = 1.8), arrow = arrow(length = unit(0.25, "cm")),curvature = .5) +
+  theme(panel.grid.minor.y = element_blank(), text = element_text(family = 'serif'), plot.title = element_text(face='bold', size= 17))
+
+```
+
+  In contrast, the distribution for Arby's is much more scattered. A majority of the days land between 48 to 75 daily visits. However, there is a group outside this range that garners around 85 to 98 visits. This group is partially the reason why Arby's draws in more average daily visitors than Five Guys. Five Guys should look into ways to generate more exceptionally performing days like Arby's to help boost overall visitors. Capitalizing on special events by providing discounts on days the event takes place could help to create this. Furthermore, if Five Guys can predict what days are more likely to have more visitors, more promotion could be pushed on these days. However, the company should be careful not to overwhelm locations with too many visitors.
+
+## Where the Visitors are Coming From
+
+``` {r map FG, echo= FALSE, warning=FALSE}
+mapdata <- block_groups('WA','033', cb = TRUE, progress_bar = FALSE)
+ov_FG <- ov %>% filter(brands == 'Five Guys')
+map_and_data_FG <- geo_join(mapdata, ov_FG, by = 'GEOID', how = 'left')
+
+ggplot(map_and_data_FG) +
+  geom_sf(aes(fill= visits), size=.15) + 
+  scale_fill_gradient(low = '#ed887a', high = '#781d10', na.value='white', n.breaks=6) +
+  theme_void() +
+  coord_sf(xlim=c(-122.51,-121.13))+
+  labs(title="Location of Five Guys Visitors", fill= 'Visitors', caption="Five Guys mainly pulls in visitors from areas surrounding Issaquah and Magnolia.") +
+    annotate(geom = 'label',x = -122.48, y = 47.61, label = 'Downtown\nSeattle', family = 'serif', size = 7.5/.pt, color= 'black') +
+  geom_curve(aes(x = -122.40, y = 47.61, xend = -122.333, yend = 47.605), arrow = arrow(length = unit(0.15, "cm")),curvature = -.25, size=.03) +
+  annotate(geom = 'label',x = -122.48, y = 47.755, label = 'Shoreline', family = 'serif', size = 7.5/.pt, color= 'black') +
+  geom_curve(aes(x = -122.41, y = 47.755, xend = -122.345, yend = 47.756), arrow = arrow(length = unit(0.15, "cm")),curvature = -.25, size=.03) +
+  annotate(geom = 'label',x = -122.235, y = 47.381, label = 'Kent', family = 'serif', size = 7.5/.pt, color= 'black') +
+  annotate(geom = 'label',x = -122.121, y = 47.674, label = 'Redmond', family = 'serif', size = 7.5/.pt, color= 'black') +
+  annotate(geom = 'label',x = -122.032, y = 47.53, label = 'Issaquah', family = 'serif', size = 7.5/.pt, color= 'black') +
+  theme(text = element_text(family = 'serif'), plot.title = element_text(face='bold', size= 17))
+```
+``` {r map A, echo=FALSE, warning=FALSE}
+ov_A <- ov %>% filter(brands == "Arby's")
+map_and_data_A <- geo_join(mapdata, ov_A, by = 'GEOID', how = 'left')
+
+ggplot(map_and_data_A) +
+  geom_sf(aes(fill= visits), size=.15) + 
+  scale_fill_gradient(low = '#ed887a', high = '#781d10', na.value='white', n.breaks=6) +
+  theme_void() +
+  coord_sf(xlim=c(-122.52,-121.13))+
+  labs(title="Location of Arby's Visitors", fill= 'Visitors', caption = "Unlike Five Guys, Arby's pulls its' visitors from Kent, Eastern King County, and Redmond.\nBoth restaurants receive vistors from very different areas, but Arby's receives visitors from more areas.") +
+  annotate(geom = 'label',x = -122.48, y = 47.61, label = 'Downtown\nSeattle', family = 'serif', size = 7.5/.pt, color= 'black') +
+  geom_curve(aes(x = -122.40, y = 47.61, xend = -122.333, yend = 47.605), arrow = arrow(length = unit(0.15, "cm")),curvature = -.25, size=.03) +
+  annotate(geom = 'label',x = -122.48, y = 47.755, label = 'Shoreline', family = 'serif', size = 7.5/.pt, color= 'black') +
+  geom_curve(aes(x = -122.41, y = 47.755, xend = -122.345, yend = 47.756), arrow = arrow(length = unit(0.15, "cm")),curvature = -.25, size=.03) +
+  annotate(geom = 'label',x = -122.235, y = 47.381, label = 'Kent', family = 'serif', size = 7.5/.pt, color= 'black') +
+  annotate(geom = 'label',x = -122.121, y = 47.674, label = 'Redmond', family = 'serif', size = 7.5/.pt, color= 'black') +
+  annotate(geom = 'label',x = -122.032, y = 47.53, label = 'Issaquah', family = 'serif', size = 7.5/.pt, color= 'black') +
+  theme(text = element_text(family = 'serif'), plot.title = element_text(face='bold', size= 17))
+```
+
+  In general, the maps reveal that most of Five Guys' visitors stem from Issaquah and some areas around Redmond and Magnolia. On the other hand, Arby's pulls its' visitors from Kent, Southeastern King County, and Redmond. In general, Arby's pulls most of its' visitors from Southern areas while Five Guys draws from areas closer to central Seattle. Both brands attract visitors from vastly different areas, but Arby's clearly takes in visitors from a larger area than Five Guys. The franchise absolutely dominates the Kent and Redmond area while Five Guys only seems to have a strong grasp on Issaquah. The brand struggles to have a strong presence anywhere else. Although this seems troubling, there are clear weaknesses in Arby's map that can be taken advantage of. Arby's has little to no presence in the area from Rainier Beach to Shoreline because it doesn't have any locations there. Five Guys, on the other hand, does. Five Guys could promote these locations in Downtown Seattle, Capital Hill, Magnolia, etc. to gain more visitors from these areas. Additionally, the company could also open a store in Downtown Seattle or somewhere similar for easier convenience for the people it Five Guys can afford it.
+
+## Conclusion
+
+  Five Guys performs fine for the most part in comparison to other limited-service burger restaurants in the King County area. It averages around 53.32 daily visitors and lands in the middle of the group. However, improvements can clearly be made. Weekday averages are slightly lower than expected and can be boosted by providing discounts on weekdays or providing other similar promotions. The brand also seems to be too middling and lacks outstanding days with high daily visitors. This can be improved by capitalizing on big events. Lastly, Five Guys should take advantage of areas where little presence is made by both itself and competitors. This mostly includes areas around central Seattle. By improving these aspects of Five Guys' performance in attracting King County visitors, the franchise will hopefully see more visitors and more people enjoying its high-quality burgers with endless toppings.
