@@ -4,9 +4,9 @@ This is a project done in R studio on the fast casual burger restaurant chain Fi
 
 Files:
 
-[BUAN 4220 Data Translation Project.html](BUAN 4220 Data Translation Project.html) -- This is the final report as an html file that includes all the visualizations and explanations on what they represent and how these findings provide valuable, actionable information that can improve average daily visits to Five Guys.
+BUAN 4220 Data Translation Project.html -- This is the final report as an html file that includes all the visualizations and explanations on what they represent and how these findings provide valuable, actionable information that can improve average daily visits to Five Guys.
 
-[BUAN 4220 Data Translation Project.Rmd](BUAN 4220 Data Translation Project.Rmd) -- This is an RMarkdown notebook used to create the final report. It contains the code on how I imported, filtered, and joined the data sets, code on how I created the visualizations using ggplot, and text used for the report that explains the visualizations.
+BUAN 4220 Data Translation Project.Rmd -- This is an RMarkdown notebook used to create the final report. It contains the code on how I imported, filtered, and joined the data sets, code on how I created the visualizations using ggplot, and text used for the report that explains the visualizations.
 
 [king_dailyvisits.Rdata](king_dailyvisits.Rdata) --  One of the two data sets from SafeGraph that includes daily visits for each day of July 2020 for various different brands of different industries.
 
